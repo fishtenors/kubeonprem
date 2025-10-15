@@ -30,6 +30,7 @@ help: ## Show this help message
 	@echo "  ${YELLOW}argocd-init: ${GREEN}Initializes ArgoCD and bootstraps the github repository${RESET}"
 	@echo "  ${YELLOW}argocd-dashboard: ${GREEN}Starts the ArgoCD admin dashboard${RESET}"
 	@echo "  ${YELLOW}get-urls: ${GREEN}Output pertinent URLs${RESET}"
+	@echo "  ${YELLOW}get-grafana-password: ${GREEN}Retrieve and output the username and password for Grafana${RESET}"
 	@echo "  ${YELLOW}status: ${GREEN}Output cluster, application and ArgoCD statuses${RESET}"
 	@echo ""
 
@@ -104,6 +105,13 @@ get-urls: ## Get application and service URLs
 	@echo "Grafana URL: http://grafana.localhost:9080"
 	@echo "Prometheus URL: http://prometheus.localhost:9080"
 	@echo "Traefik URL: http://traefik.localhost:9080"
+	@echo ""
+
+get-grafana-password: ## Get Grafana admin password
+	@echo "${GREEN}Grafana Admin Password:${RESET}"
+	@kubectl get secret prometheus-grafana -o jsonpath="{.data.admin-password}" -n ${OBSERVE_NS} | base64 --decode ; echo
+	@echo ""
+	@echo "Username: admin"
 	@echo ""
 
 status: ## Show cluster and application status
