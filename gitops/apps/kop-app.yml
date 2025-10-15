@@ -1,0 +1,258 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kop-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:fishtenors/kubeonprem.git
+    targetRevision: HEAD
+    path: app
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kop-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      labels:
+        name: kop-app
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kop-app-sa
+  namespace: kop-app
+automountServiceAccountToken: false
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kop-app-role
+  namespace: kop-app
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "events", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["traefik.io"]
+    resources: ["ingressroutes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kop-app-rolebinding
+  namespace: kop-app
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kop-app-role
+subjects:
+- kind: ServiceAccount
+  name: kop-app-sa
+  namespace: kop-app
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: kop-app
+  name: kop-app
+  namespace: kop-app
+spec:
+  # replicas: 2
+  selector:
+    matchLabels:
+      app: kop-app
+  template:
+    metadata:
+      labels:
+        app: kop-app
+    spec:
+      serviceAccountName: kop-app-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: kop-ghcr
+      containers:
+      - image: ghcr.io/fishtenors/kubeonprem:placeholder
+        imagePullPolicy: IfNotPresent
+        name: simple-web
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          failureThreshold: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kop-app
+  name: kop-app
+  namespace: kop-app
+spec:
+  selector:
+    app: kop-app
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kop-app
+  namespace: kop-app
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`kop.localhost`)
+      kind: Rule
+      services:
+        - name: kop-app
+          port: 8080
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kop-app-sm
+  namespace: kop-app
+  labels:
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app: kop-app
+  namespaceSelector:
+    matchNames:
+      - kop-app
+  endpoints:
+    - port: http
+      interval: 30s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kop-app-pm
+  namespace: kop-app
+  labels:
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app: kop-app
+  namespaceSelector:
+    matchNames:
+      - kop-app
+  podMetricsEndpoints:
+    - port: http
+      interval: 30s
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kop-app-ts-ingress
+  namespace: kop-app
+  annotations:
+    tailscale.com/funnel: "true"
+spec:
+  defaultBackend:
+    service:
+      name: kop-app
+      port:
+        number: 8080
+  ingressClassName: tailscale
+  tls:
+    - hosts:
+        - appkop
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kop-app-hpa
+  namespace: kop-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kop-app
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 30
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 30
+

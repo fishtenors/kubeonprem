@@ -1,0 +1,39 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# App
+/app/venv
+/app/__pycache__
+/app/*.pyc
+/app/*_cache
+
+# Terraform
+infra/*.tfstate
+infra/*.tfstate.*
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate.backup
+infra/*.tfvars
+
+# Tools
+/infra/checkov*.check
+/infra/terraform.tfvars
+/infra/*-cluster-config
+
+# Secrets (double-check nothing committed)
+*secret*
+*key*
+*credentials*
+
+# CI/CD
+.github/workflows/*.log
+

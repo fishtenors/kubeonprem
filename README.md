@@ -1,0 +1,2 @@
+# Kubernetes On Prem
+A repository used to demonstrate standing up a local, lightweight kubernetes cluster, bootstrap with a GitOps continuous delivery tool, and deploy a simple web application. See `docs/README.md` for further details.

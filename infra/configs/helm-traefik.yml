@@ -1,0 +1,56 @@
+# Helper sources:
+# https://blue42.net/devops/2021/k8s-kind-traefik/
+---
+service:
+  type: NodePort
+ports:
+  web:
+    nodePort: 30080
+  websecure:
+    nodePort: 30443
+# nodeSelector:
+#   ingress-ready: "true"
+# tolerations:
+#   - key: node-role.kubernetes.io/master
+#     operator: Equal
+#     effect: NoSchedule
+ingressRoute:
+  dashboard:
+    enabled: true
+    matchRule: Host(`traefik.localhost`)
+    entryPoints:
+      - web
+providers:
+  kubernetesGateway:
+    enabled: true
+gateway:
+  listeners:
+    web:
+      namespacePolicy:
+        from: All
+resources:
+  requests:
+    cpu: "100m"
+    memory: "50Mi"
+  limits:
+    cpu: "300m"
+    memory: "150Mi"
+deployment:
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+    prometheus.io/path: "/metrics"
+metrics:
+  prometheus:
+    enabled: true
+    entryPoint: metrics
+# autoscaling:
+#   enabled: true
+#   maxReplicas: 2
+#   metrics:
+#   - type: Resource
+#     resource:
+#       name: cpu
+#       target:
+#         type: Utilization
+#         averageUtilization: 80
