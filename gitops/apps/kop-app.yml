@@ -97,7 +97,7 @@ spec:
       imagePullSecrets:
       - name: kop-ghcr
       containers:
-      - image: ghcr.io/fishtenors/kubeonprem:placeholder
+      - image: ghcr.io/fishtenors/kubeonprem:4171ff610217989fa8944889a8fb59a81f88ba41
         imagePullPolicy: IfNotPresent
         name: simple-web
         securityContext:
