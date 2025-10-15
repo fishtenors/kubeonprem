@@ -60,14 +60,13 @@ up: check-deps ## Bootstrap the entire platform
 
 down: ## Destroy the cluster and cleanup
 	@echo "${YELLOW}Destroying cluster...${RESET}"
-# 	@cd infra && terraform destroy -auto-approve
 	@cd infra && terraform destroy --target github_repository_deploy_key.kop_deploy_key -auto-approve && terraform destroy --target kind_cluster.kop_cluster -auto-approve
 	@echo "${YELLOW}Cleaning up Terraform files...${RESET}"
 	@rm -rf infra/.terraform infra/.terraform.lock.hcl
 	@rm -rf infra/terraform.tfstate*
 	@rm -rf infra/kop-cluster-config
 	@echo "${GREEN}Cluster destroyed${RESET}"
-	echo ""
+	@echo ""
 
 ## Terraform Commands
 terraform-init: ## Initialize Terraform
@@ -80,8 +79,6 @@ terraform-plan: terraform-init ## Plan Terraform changes
 terraform-apply: terraform-init ## Apply Terraform configuration
 	@echo "${GREEN}Creating cluster...${RESET}"
 	@cd infra && terraform apply -auto-approve
-# 	@echo "${YELLOW}Waiting for cluster to be ready...${RESET}"
-# 	@kubectl wait --for=condition=Ready nodes --all --timeout=120s
 	@echo "${GREEN}Cluster ready${RESET}"
 	@echo ""
 
