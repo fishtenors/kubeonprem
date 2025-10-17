@@ -68,16 +68,99 @@ subjects:
   name: kop-app-sa
   namespace: kop-app
 
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   labels:
+#     app: kop-app
+#   name: kop-app
+#   namespace: kop-app
+# spec:
+#   # replicas: 2
+#   selector:
+#     matchLabels:
+#       app: kop-app
+#   template:
+#     metadata:
+#       labels:
+#         app: kop-app
+#     spec:
+#       serviceAccountName: kop-app-sa
+#       automountServiceAccountToken: false
+#       securityContext:
+#         runAsNonRoot: true
+#         runAsUser: 65534
+#         fsGroup: 65534
+#         seccompProfile:
+#           type: RuntimeDefault
+#       imagePullSecrets:
+#       - name: kop-ghcr
+#       containers:
+#       - image: ghcr.io/fishtenors/kubeonprem:4171ff610217989fa8944889a8fb59a81f88ba41
+#         imagePullPolicy: IfNotPresent
+#         name: simple-web
+#         securityContext:
+#           allowPrivilegeEscalation: false
+#           readOnlyRootFilesystem: true
+#           runAsNonRoot: true
+#           runAsUser: 65534
+#           capabilities:
+#             drop:
+#             - ALL
+#         resources:
+#           limits:
+#             cpu: "200m"
+#             memory: "256Mi"
+#           requests:
+#             cpu: "100m"
+#             memory: "128Mi"
+#         ports:
+#           - containerPort: 8080
+#             name: http
+#             protocol: TCP
+#         readinessProbe:
+#           httpGet:
+#             path: /ready
+#             port: 8080
+#           initialDelaySeconds: 5
+#         livenessProbe:
+#           httpGet:
+#             path: /health
+#             port: 8080
+#           initialDelaySeconds: 15
+#           periodSeconds: 30
+#           failureThreshold: 3
+#         startupProbe:
+#           httpGet:
+#             path: /ready
+#             port: 8080
+#           initialDelaySeconds: 10
+#           periodSeconds: 3
+#           failureThreshold: 5
+
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
-  labels:
-    app: kop-app
-  name: kop-app
+  name: kop-app-rollout
   namespace: kop-app
+labels:
+  app: kop-app
 spec:
-  # replicas: 2
+  #replicas: 5
+  strategy:
+    canary:
+      steps:
+      - setWeight: 20
+      - pause: {}
+      - setWeight: 40
+      - pause: {duration: 10}
+      - setWeight: 60
+      - pause: {duration: 10}
+      - setWeight: 80
+      - pause: {duration: 10}
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app: kop-app
@@ -138,6 +221,7 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 3
           failureThreshold: 5
+
 
 ---
 apiVersion: v1
@@ -235,11 +319,15 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: kop-app-hpa
   namespace: kop-app
+labels:
+  app: kop-app
 spec:
   scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: kop-app
+    #apiVersion: apps/v1
+    #kind: Deployment
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    name: kop-app-rollout
   minReplicas: 2
   maxReplicas: 8
   metrics:
